@@ -16,5 +16,5 @@ def beta(Ke,Q,Mixing,Masses):
     Ns*Fermi(2,Ke)*Ee*pe*
 
 #testing
-def Fermi(Z,Ke)
-		1/(1+np.exp(Ke+mass-Ef(Z))/Ke*kb))
+def Fermi(Z,Ke):
+	1/(1+np.exp(Ke+mass-Ef(Z))/Ke*kb))
