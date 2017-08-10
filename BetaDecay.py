@@ -12,3 +12,5 @@ def Momentum(mass,Ke):
 
 def beta(Ke,Q,Mixing,Masses):
     Ns*Fermi(2,Ke)*Ee*pe*
+
+#testing
