@@ -23,6 +23,27 @@ def Ef(Ke): 		# The fermi level of H-3
 
 
 def beta(Ke,Q,Mixing,Masses):   #The beta spectrum (NOT DONE)
-    Ns*Fermi(2,Ke)*Energy(me,Ke)*Momentum(me,Ke)*
+
+    p = []  #excitation probabilities
+    Exe = [] #excitation energies
+
+    rate = Ns*Fermi(Ke)*Energy(me,Ke)*Momentum(me,Ke)
+
+    sum = 0
+
+    for (prob,excit) in zip(p,Exe):
+        
+        for (mix,mass) in zip(Mixing,Masses):
+            temp = prob*excit * mix**2 * math.sqrt(excit**2 - mass**2)
+            
+            if (excit - mass) >= 0.:
+                sum += temp
+
+    rate *= sum
+
+    return rate
+            
+    
+    
 
 
