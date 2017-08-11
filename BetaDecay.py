@@ -11,6 +11,6 @@ def Momentum(mass,Ke):
     return math.sqrt(Energy(mass,Ke)**2 - mass**2)
 
 def beta(Ke,Q,Mixing,Masses):
-    Ns*Fermi(2,Ke)*Ee*pe*
+    Ns*Fermi(2,Ke)*Energy(me,Ke)*Momentum(me,Ke)*
 
-#testing
+
