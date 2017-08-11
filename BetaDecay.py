@@ -34,9 +34,9 @@ def beta(Ke,Q,Mixing,Masses):   #The beta spectrum (NOT DONE)
     for (prob,excit) in zip(p,Exe):
         
         for (mix,mass) in zip(Mixing,Masses):
-            temp = prob*excit * mix**2 * math.sqrt(excit**2 - mass**2)
+            temp = prob*(Q-excit-Ke) * mix**2 * math.sqrt((Q-excit-Ke)**2 - mass**2)
             
-            if (excit - mass) >= 0.:
+            if ((Q-excit-Ke) - mass) >= 0.:
                 sum += temp
 
     rate *= sum
