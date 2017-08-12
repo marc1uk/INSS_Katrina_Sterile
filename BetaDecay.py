@@ -95,9 +95,19 @@ def DataSpectrum(mass,Mixing):	# simulated count spectrum for a given mass and m
 # ===========================================================================================
 # 3. Function for calculating the chi^2 between a given dataset and the no-sterile hypothesis
 # ===========================================================================================
-def Chi2FitToNull(dataspectrum):
-### TODO to be filled in
+def Chi2Test(observe, expect):	# chi2 test for each bin
+    sigma = np.sqrt(expect)
+    return value = (observe**2 - expect**2)/sigma**2
 
+def Chi2FitToNull(dataSpectrum):	# Sum the elemental chi2 value.
+    nullSpectrum = DataSpectrum(0, 0);
+    assert len(nullSpectrum) == len(dataSpectrum), "The bin numbers of the spectra do not match."    
+    summation = 0
+	for i in range (0, len(dataSpectrum)):
+        chi2 = Chi2Test(nullSpectrum[i] - dataspectrum[i]);
+        summation += chi2
+    return summation
+    
 # ===========================================================================================
 # 4. Function for calculating the matrix of chi^2 over a range of masses and mixing angles
 # ===========================================================================================
