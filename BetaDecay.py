@@ -2,6 +2,11 @@
 import numpy as np
 import pylab as P
 import math 
+import matplotlib.pyplot
+import os, sys
+import ROOT
+from ROOT import TCanvas, TFile, TProfile, TNtuple, TH1F, TH2F, TF1
+from ROOT import gROOT, gBenchmark, gRandom, gSystem, Double
 
 # A short program to estimate the sensitivity of the Katrin experiment to sterile neutrinos. 
 # The program is intended to produce contours in the sterile mass - sterile mixing angle plane
@@ -41,6 +46,9 @@ Ns = 1.47e-13					# Total number of emitted electron for KATRIN
 me = 511						# Mass of electron
 kb = 8.76e-5					# Boltzmann radius
 a0 = 2.68e-4;					# Bohr radius
+numbins = 100					# number of bins for simulated data
+kemin = 1000					# min of the energy range - 1keV
+kemax = 20000					# max of the energy range - 20keV
 # -------------------------------
 def Energy(mass,Ke):			# Energy of electron
 	return mass + Ke
@@ -55,11 +63,10 @@ def Ef(Ke): 					# The fermi level of H-3
 	eta = 1/(a0*Momentrum(me, Ke))
 	return 4*np.pi*eta/(1-np.exp(-4*np.pi*eta))
 # -------------------------------
-def beta(Ke,Q,Mixing,Masses):	# The beta spectrum (NOT DONE)
+def beta(Ke,Q,Mixing,Masses): # (NOT DONE)
 	### FIXME
 	### isn't Q a constant? Why is it needed as an argument?
-	### is this returning the data count spectrum returning (a vector),
-	### or the function specifying the underlying distribution (a TF1)?
+	### Why is 'Masses' plural? doesn't the spectrum only depend on the (one) sterile mass?
 	
 	p = []						# excitation probabilities
 	Exe = []					# excitation energies
@@ -79,6 +86,18 @@ def beta(Ke,Q,Mixing,Masses):	# The beta spectrum (NOT DONE)
 	rate *= sum
 	
 	return rate
+# -------------------------------
+# To create a TF1 object with a custom function, the function must take it's arguments via arrays
+# We could do away with this function by suitably defining beta - this is just a wrapper.
+def BetaSpectrum(variables,parameters):
+	Ke = variables[0]
+	Mixing = parameters[0]
+	Mass = parameters[1]
+	return beta(Ke, 0, Mixing, Mass) ### FIXME remove 0 if not passing Q
+# -------------------------------
+# A TF1 object based on the spectrum is needed to do fits with PyROOT, find chi2 etc.
+npars = 2						# Num parameters required for our custom function
+betatf1 = TF1('betaspectrum', BetaSpectrum, kemin, kemax, npars)
 
 # ===========================================================================================
 # 2. Function for generating fake data spectrum for given mass and mixing angle
@@ -86,17 +105,32 @@ def beta(Ke,Q,Mixing,Masses):	# The beta spectrum (NOT DONE)
 def DataSpectrum(mass,Mixing):	# simulated count spectrum for a given mass and mixing angle
 	### FIXME it would be easier/nicer to step over Sin^2(theta_s) directly than theta_s
 	### so ensure DataSpectrum takes this as an argument
-	spectrum = []
-	numbins = 100
-	for i in range(0,numbins-1):		# spectrum runs from 0.1 to 18.574keV over 100 bins.
-		Ke = 0.1 + 186.6*i		# gives Ke in eV.
-		spectrum.append(beta(Ke,0,Mixing,mass))  # FIXME Q=???
-	return spectrum				# return the spectrum binned into 100 bins
+	betatf1.SetParameters(mass,Mixing)
+
+	spectrumhist = TH1F('spectrum', 'Simulated Data', numbins, kemin, kemax)
+	# not sure how to do this - do we want to generate a suitable number of 'hits'
+	for hit in range(0,numhits):
+		KeOfThisHit = betatf1.GetRandom()
+		spectrumhist.Fill(KeOfThisHit)
+	# convert histogram to array...?
+	spectrum = spectrumhist.GetArray()			# this returns a pointer in c++...??? what about in python??
+	return spectrum								# return simulated data
+	
+	# or can we somehow just generate the number of entries in each bin directly?
+	for i in range(0,numbins-1):				# spectrum runs from 0.1 to 18.574keV over 100 bins.
+		Ke = kemin + (i/numbins)*(kemax-kemin)	# Ke of this bin centre in eV
+		bincount = ??? ### FIXME
+		# normalise to the number of counts over a 3 year period?
+		datacount = totalcounts*unitcount 		### FIXME necesary? need to define totalcounts.
+		spectrum.append(datacount)
+	
+	return spectrum								# return simulated data
+
 # ===========================================================================================
 # 3. Function for calculating the chi^2 between a given dataset and the no-sterile hypothesis
 # ===========================================================================================
 def Chi2FitToNull(dataspectrum):
-### TODO to be filled in
+### TODO
 
 # ===========================================================================================
 # 4. Function for calculating the matrix of chi^2 over a range of masses and mixing angles
@@ -111,6 +145,8 @@ def CalculateChi2Matrix:
 	#alpha = 2.7x10^-3 = 0.0027 for 3 sigma -> chi^2 ~8
 	chi2for3sigma = 8			# what chi2 value corresponds to a 3 sigma deviation from the null hypothesis
 	chi2matrix = 
+	sin2mixangmin = 0			# range of sin^2(theta_s) values from mixingangmax and mixingangmin
+	sin2mixangmax = 0			# this range is needed for fitting a curve to the chi2 values
 # 4. Loop over a vector of prospective neutrino masses.
 	for i in range(0,nummasses-1):
 		mass = massmin*1000 + (i/nummasses)*((massmax-massmin)*1000)
@@ -119,14 +155,25 @@ def CalculateChi2Matrix:
 		for j in range(0,nummixingangs-1):
 			power = mixingangmin + (j/nummixingangs)*(mixingangmax-mixingangmin)
 			sin2mixang = 10 ** power
+#       - Note the max and min sin^2(mixingang) values; we'll use them for fitting 
+#         our range of chi2 vs sin2mixang
+			if (j==0)
+				sin2mixangmin = sin2mixang
+			else if (j==nummixingangs-1)
+				sin2mixangmax = sin2mixang
 #       - Generate a set of datapoints representing a measured spectrum for that mass and mixing angle.
 			dataset = DataSpectrum(mass, sin2mixang)
 #       - Calculate the chi^2 of the null hypothesis fit to the data
 			chi2 = Chi2FitToNull(dataset)
 #       - Store the result in a vector for this mass.
-			chi2forthismass[j]=chi2
+			chi2forthismass[j] = chi2
+		# plot the chi2 curve, for checking
+		thismassplot = matplotlib.pyplot.plot(chi2forthismass)
+		matplotlib.pyplot.show()
 #    +  Fit a curve to the span of chi^2 vs mixing angle values, for this mass
-		thefit = SomeFit(chi2forthismass)	### FIXME How do i fit curve?
+		fitfunc = TF1( 'fitfunc', 'pol2',  sin2mixangmin,  sin2mixangmax) # PRESUME quadratic is suitable
+		thefit = massgraph.Fit(fitfunc)		### FIXME Fit is a method of TGraph or TH1
+											# - need chi2 vs mixingang as a TGraph... 
 #    +  Find the mixing angles at which chi^2 = 3 sigma.
 		exclusionlimits = thefit.eval(chi2for3sigma)			### FIXME How do i lookup curve values?
 #    +  Add the pair of values to a vector - one entry per mass, each entry the max/min mixing angles.
