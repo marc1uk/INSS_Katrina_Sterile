@@ -5,6 +5,8 @@ import math
 import matplotlib.pyplot
 import os, sys
 import ROOT
+from array import array
+# could replace with from ROOT import *
 from ROOT import TCanvas, TFile, TProfile, TNtuple, TH1F, TH2F, TF1
 from ROOT import gROOT, gBenchmark, gRandom, gSystem, Double
 
@@ -35,20 +37,31 @@ from ROOT import gROOT, gBenchmark, gRandom, gSystem, Double
 #    Each pair corresponds to the range of mixing angles that are consistent with the null hypothesis
 #    at that mass. 
 
-
 # ===========================================================================================
-# 1. Function for representing the tritium beta decay spectrum, including a potential sterile
+# Global constants
 # ===========================================================================================
-# constants and support functions
-# -------------------------------
 # Use eV as as universal unit(?)
 Ns = 1.47e-13					# Total number of emitted electron for KATRIN
 me = 511						# Mass of electron
 kb = 8.76e-5					# Boltzmann radius
 a0 = 2.68e-4;					# Bohr radius
 numbins = 100					# number of bins for simulated data
-kemin = 1000					# min of the energy range - 1keV
-kemax = 20000					# max of the energy range - 20keV
+nummixingangs = 20				# number of steps in mixing angle range scan
+nummasses = 20					# number of steps in mass range scan
+kemin = 0						# min of the electron energy spectrum (eV)
+kemax = 18575					# max of the electron energy spectrum (eV)
+mixingangmin = 6				# we'll scan a range of mixings such that sin^2(theta_s)
+mixingangmax = 10				# spans the range 10^-(mixingangmax) -> 10^-(mixingangmin)
+massmin = 1000					# minimum sterile mass (eV)
+massmax = 20000					# maximum sterile mass (eV)
+#alpha = 2.7x10^-3 = 0.0027 for 3 sigma -> chi^2 ~8
+chi2for3sigma = 8				# what chi2 value corresponds to a 3 sigma deviation from the null hypothesis
+integrationtime = 3*360*24*3600 # 3 years of running, assuming spectrum is defined in counts/s FIXME if necessary
+
+# ===========================================================================================
+# 1. Function for representing the tritium beta decay spectrum, including a potential sterile
+# ===========================================================================================
+# Support functions
 # -------------------------------
 def Energy(mass,Ke):			# Energy of electron
 	return mass + Ke
@@ -95,7 +108,8 @@ def BetaSpectrum(variables,parameters):
 	Mass = parameters[1]
 	return beta(Ke, 0, Mixing, Mass) ### FIXME remove 0 if not passing Q
 # -------------------------------
-# A TF1 object based on the spectrum is needed to do fits with PyROOT, find chi2 etc.
+# A TF1 object based on the spectrum is needed to generate the expected counts for simulated data
+# Note: this needs to give the counts - i.e. THE INTEGRATED RATE SPECTRUM PER UNIT ENERGY FIXME
 npars = 2						# Num parameters required for our custom function
 betatf1 = TF1('betaspectrum', BetaSpectrum, kemin, kemax, npars)
 
@@ -108,21 +122,26 @@ def DataSpectrum(mass,Mixing):	# simulated count spectrum for a given mass and m
 	betatf1.SetParameters(mass,Mixing)
 
 	spectrumhist = TH1F('spectrum', 'Simulated Data', numbins, kemin, kemax)
-	# not sure how to do this - do we want to generate a suitable number of 'hits'
-	for hit in range(0,numhits):
+	# method 1: generate a suitable number of 'hits' point by point and bin into a histogram
+	totalcounts = 999999 						# FIXME integrated hits over the whole spectrum, need to calculate this
+	for hit in range(0,totalcounts):
 		KeOfThisHit = betatf1.GetRandom()
 		spectrumhist.Fill(KeOfThisHit)
-	# convert histogram to array...?
-	spectrum = spectrumhist.GetArray()			# this returns a pointer in c++...??? what about in python??
+	spectrumbuffer = spectrumhist.GetArray()	# this returns a pointer to a ROOT buffer... weird to handle these in Python
+	spectrum=[]
+	for bini in range(0,numbins):				# convert it to a normal list
+		spectrum.append(spectrumbuffer[bini]
 	return spectrum								# return simulated data
 	
-	# or can we somehow just generate the number of entries in each bin directly?
+	# method 2: generate the number of entries in each bin directly, taking into account statistics
+	spectrumnormalisation = 99999				# FIXME is any further normalisation necesary? 
 	for i in range(0,numbins-1):				# spectrum runs from 0.1 to 18.574keV over 100 bins.
 		Ke = kemin + (i/numbins)*(kemax-kemin)	# Ke of this bin centre in eV
-		bincount = ??? ### FIXME
-		# normalise to the number of counts over a 3 year period?
-		datacount = totalcounts*unitcount 		### FIXME necesary? need to define totalcounts.
-		spectrum.append(datacount)
+		expectedbincount = betaf1.Eval(Ke)*integrationtime
+		bincontents = np.random.poisson(expectedbincount) # pull from a poisson with mean @ expected. FIXME is binoimial preferable?
+		# normalise if necessary  - need to define totalcounts
+		scaledbincontents = totalcounts*bincontents 	### FIXME necesary? 
+		spectrum.append(scaledbincontents)
 	
 	return spectrum								# return simulated data
 
@@ -138,7 +157,7 @@ def Chi2FitToNull(dataSpectrum):	# Sum the elemental chi2 value.
     assert len(nullSpectrum) == len(dataSpectrum), "The bin numbers of the spectra do not match."    
     summation = 0
 	for i in range (0, len(dataSpectrum)):
-        chi2 = Chi2Test(nullSpectrum[i], dataspectrum[i]); ### XXX pass as 2 args rather than passing diff
+        chi2 = Chi2Test(nullSpectrum[i], dataspectrum[i]); ### XXX fixed to pass as 2 args rather than passing diff
         summation += chi2
     return summation
     
@@ -146,54 +165,73 @@ def Chi2FitToNull(dataSpectrum):	# Sum the elemental chi2 value.
 # 4. Function for calculating the matrix of chi^2 over a range of masses and mixing angles
 # ===========================================================================================
 def CalculateChi2Matrix:
-	nummixingangs = 20			# number of steps in mixing angle range scan
-	mixingangmin = 6			# we'll scan a range of mixings such that
-	mixingangmax = 10			# sin^2(theta_s) = 10^-(mixingangmax) -> 10^-(mixingangmin)
-	nummasses = 20				# number of steps in mass range scan
-	massmin = 1					# minimum mass in keV
-	massmax = 20				# maximum mass in keV
-	#alpha = 2.7x10^-3 = 0.0027 for 3 sigma -> chi^2 ~8
-	chi2for3sigma = 8			# what chi2 value corresponds to a 3 sigma deviation from the null hypothesis
-	chi2matrix = 
-	sin2mixangmin = 0			# range of sin^2(theta_s) values from mixingangmax and mixingangmin
-	sin2mixangmax = 0			# this range is needed for fitting a curve to the chi2 values
+	chi2array = []				# make 
+	mixinganglelist = []
 # 4. Loop over a vector of prospective neutrino masses.
 	for i in range(0,nummasses-1):
-		mass = massmin*1000 + (i/nummasses)*((massmax-massmin)*1000)
-		chi2forthismass = range(1,nummixingangs)
+		mass = massmin + (i/nummasses)*(massmax-massmin)
+		chi2forthismass = []
 #    +  Loop over a vector of prospective mixing angles.
 		for j in range(0,nummixingangs-1):
 			power = mixingangmin + (j/nummixingangs)*(mixingangmax-mixingangmin)
 			sin2mixang = 10 ** power
-#       - Note the max and min sin^2(mixingang) values; we'll use them for fitting 
-#         our range of chi2 vs sin2mixang
-			if (j==0)
-				sin2mixangmin = sin2mixang
-			else if (j==nummixingangs-1)
-				sin2mixangmax = sin2mixang
+			if (i==0):
+				mixinganglelist.append(sin2mixang)
 #       - Generate a set of datapoints representing a measured spectrum for that mass and mixing angle.
 			dataset = DataSpectrum(mass, sin2mixang)
 #       - Calculate the chi^2 of the null hypothesis fit to the data
 			chi2 = Chi2FitToNull(dataset)
 #       - Store the result in a vector for this mass.
-			chi2forthismass[j] = chi2
+			chi2forthismass.append(chi2)
 		# plot the chi2 curve, for checking
 		thismassplot = matplotlib.pyplot.plot(chi2forthismass)
 		matplotlib.pyplot.show()
-#    +  Fit a curve to the span of chi^2 vs mixing angle values, for this mass
-		fitfunc = TF1( 'fitfunc', 'pol2',  sin2mixangmin,  sin2mixangmax) # PRESUME quadratic is suitable
-		thefit = massgraph.Fit(fitfunc)		### FIXME Fit is a method of TGraph or TH1
-											# - need chi2 vs mixingang as a TGraph... 
-#    +  Find the mixing angles at which chi^2 = 3 sigma.
-		exclusionlimits = thefit.eval(chi2for3sigma)			### FIXME How do i lookup curve values?
-#    +  Add the pair of values to a vector - one entry per mass, each entry the max/min mixing angles.
-		chi2matrix.append( [exclusionlimits.first, exclusionlimits.second] )
+		# turns out to draw contours we can just use the curves directly, we don't need to find the values at 3 sigma
+		chi2array.append(chi2forthismass)
+	return chi2array
+# Obselete code, originally to fit a polynomial to the range of chi2's and find the mixing angles where chi2 corresponds to 3 sigma
+#		# TGraph takes array.array datatypes, so we need to convert from python lists
+#		mixinganglelistar = array('d',mixinganglelist)
+#		chi2forthismassar = array('d',chi2forthismass)
+#		chi2vsmasstgraph = TGraph(nummixingangs,mixinganglelistar,chi2forthismassar)
+##    +  Fit a curve so we can lookup the mixing angle for a given chi2
+#		fitfunc = TF1( 'fitfunc', 'pol2',  mixinganglelist[0],  mixinganglelist[-1]) # PRESUME quadratic
+#		thefit = chi2vsmasstgraph.Fit(fitfunc)		# should check the status of the fit
+##    +  Find the mixing angles at which chi^2 = 3 sigma.
+#		# To do this, we can shift the parabola down such that the 3-sigma line is at 0, then find the roots
+#		fitparameters = thefit.GetParameters()
+#		fitparametersaslist = [fitparameters[2],fitparameters[1],fitparameters[0]-chi2for3sigma] # reverse order!
+#		theroots = np.roots(fitparametersaslist)
+##    +  Store the pair of values to a vector - one entry per mass, each entry the max/min mixing angles.
+#		chi2array.append([theroots[0], theroots[1]])
+# End obselete code -------
 
 # ===========================================================================================
 # 5. Function for producing the contour plots
 # ===========================================================================================
+#http://matplotlib.org/examples/pylab_examples/contour_demo.html
+#https://stackoverflow.com/questions/25206580/in-python-can-matplotlibs-contour-function-return-the-points-of-a-particular-c?rq=1
 # 5. Implement a function that takes the results and produces a contour plot. Results are stored in
 #    a matrix, where each row stores the range of mixing angles that are consistent with
 #    the null hypothesis at that mass
+def MakeContourPlots(masses, mixings, chi2vals):
+	matplotlib.pyplot.figure()
+	contourplot = matplotlib.pyplot.contourf(masses, mixings, chi2vals, chi2for3sigma) # contour gives lines, contourf fills
+	matplotlib.pyplot.title('3 Sigma Exclusion Limits over 3 Years, Statistical Only')
+	matplotlib.pyplot.xlabel('Sterile Mass (eV)')
+	matplotlib.pyplot.ylabel('Sterile-Electron Mixing Angle (rads)')
+	matplotlib.pyplot.show()
 
-
+# ===========================================================================================
+# 6. The Main Function
+# ===========================================================================================
+def main():
+	thechi2matrix = CalculateChi2Matrix()
+	MakeContourPlots()
+	## wait for input to keep the plot alive. 
+	if __name__ == '__main__':
+		rep = ''
+		while not rep in [ 'q', 'Q' ]:
+			rep = raw_input( 'enter "q" to quit: ' )
+			if 1 < len(rep):
+				rep = rep[0]
