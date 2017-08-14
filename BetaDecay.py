@@ -143,6 +143,8 @@ def DataSpectrum(mass,Mixing):	# simulated count spectrum for a given mass and m
 		scaledbincontents = totalcounts*bincontents 	### FIXME necesary? 
 		spectrum.append(scaledbincontents)
 	
+	# method 3: statistical 
+	
 	return spectrum								# return simulated data
 
 # ===========================================================================================
