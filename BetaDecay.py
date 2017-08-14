@@ -99,6 +99,18 @@ def beta(Ke,Q,Mixing,Masses): # (NOT DONE)
 	rate *= sum
 	
 	return rate
+
+def BetaHist():  # Generate the beta histogram
+    hist = []    # Declare the content of the histogram
+    binWidth = (kemin-kemax)/numbins
+    for ki in range(kemin, kemax, binWidth):
+        leftBinEdge = beta(ki, Q, 0, 0)  # FIXME assuming Q is a variable and null scenario.
+        rightBinEdge = beta(ki+binWidth, Q, 0, 0)
+        binContent = binWidth*(leftBinEdge+rightBinEdge)/2
+        binContent *= integrationtime    # Unnecesarry if bin content is event rate.
+        hist.append(binContent);
+    return hist
+          
 # -------------------------------
 # To create a TF1 object with a custom function, the function must take it's arguments via arrays
 # We could do away with this function by suitably defining beta - this is just a wrapper.
