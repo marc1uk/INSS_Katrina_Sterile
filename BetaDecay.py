@@ -57,6 +57,10 @@ massmax = 20000					# maximum sterile mass (eV)
 #alpha = 2.7x10^-3 = 0.0027 for 3 sigma -> chi^2 ~8
 chi2for3sigma = 8				# what chi2 value corresponds to a 3 sigma deviation from the null hypothesis
 integrationtime = 3*360*24*3600 # 3 years of running, assuming spectrum is defined in counts/s FIXME if necessary
+excitationfile = 'HeTtable.csv'
+with open(excitationfile,'rb') as file:
+	reader = csv.reader(f,quoting=csv.QUOTE_NONNUMERIC)
+	daughthertable = list(reader)
 
 # ===========================================================================================
 # 1. Function for representing the tritium beta decay spectrum, including a potential sterile
@@ -81,19 +85,17 @@ def beta(Ke,Q,Mixing,Masses): # (NOT DONE)
 	### isn't Q a constant? Why is it needed as an argument?
 	### Why is 'Masses' plural? doesn't the spectrum only depend on the (one) sterile mass?
 	
-	p = []						# excitation probabilities
-	Exe = []					# excitation energies
-	
+
 	rate = Ns*Fermi(Ke)*Energy(me,Ke)*Momentum(me,Ke)
 	
 	sum = 0
 	
-	for (prob,excit) in zip(p,Exe):
+	for pair in len(daughtertable):
 		
 		for (mix,mass) in zip(Mixing,Masses):
-			temp = prob*(Q-excit-Ke) * mix**2 * math.sqrt((Q-excit-Ke)**2 - mass**2)
+			temp = daughtertable[pair][1]*(Q-daughtertable[pair][0]-Ke) * mix**2 * math.sqrt((Q-daughtertable[pair][0]-Ke)**2 - mass**2)
 	
-			if ((Q-excit-Ke) - mass) >= 0.:
+			if ((Q-daughtertable[pair][0]-Ke) - mass) >= 0.:
 				sum += temp
 	
 	rate *= sum
