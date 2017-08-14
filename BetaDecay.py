@@ -155,11 +155,11 @@ def Chi2Test(observe, expect):	# chi2 test for each bin
     return value = (observe**2 - expect**2)/sigma**2
 
 def Chi2FitToNull(dataSpectrum):	# Sum the elemental chi2 value.
-    nullSpectrum = DataSpectrum(0, 0);
+    nullSpectrum = DataSpectrum(0, 0)
     assert len(nullSpectrum) == len(dataSpectrum), "The bin numbers of the spectra do not match."    
     summation = 0
-	for i in range (0, len(dataSpectrum)):
-        chi2 = Chi2Test(nullSpectrum[i], dataspectrum[i]); ### XXX fixed to pass as 2 args rather than passing diff
+    for i in range (0, len(dataSpectrum)):
+        chi2 = Chi2Test(nullSpectrum[i], dataspectrum[i]) ### XXX fixed to pass as 2 args rather than passing diff
         summation += chi2
     return summation
     
