@@ -45,7 +45,7 @@ Ns = 1.47e-13					# Total number of emitted electron for KATRIN
 me = 511						# Mass of electron
 kb = 8.76e-5					# Boltzmann radius
 a0 = 2.68e-4;					# Bohr radius
-numbins = 100					# number of bins for simulated data
+numkebins = 100					# number of bins for simulated data
 nummixingangs = 20				# number of steps in mixing angle range scan
 nummasses = 20					# number of steps in mass range scan
 kemin = 0						# min of the electron energy spectrum (eV)
@@ -57,6 +57,8 @@ massmax = 20000					# maximum sterile mass (eV)
 #alpha = 2.7x10^-3 = 0.0027 for 3 sigma -> chi^2 ~8
 chi2for3sigma = 8				# what chi2 value corresponds to a 3 sigma deviation from the null hypothesis
 integrationtime = 3*360*24*3600 # 3 years of running, assuming spectrum is defined in counts/s FIXME if necessary
+totalrate = 1.47*(10.**-13)		# total rate in counts second^-1 eV^-5???
+totalcounts = totalrate * integrationtime * (kemax*kemin) # FIXME
 
 # ===========================================================================================
 # 1. Function for representing the tritium beta decay spectrum, including a potential sterile
@@ -121,9 +123,8 @@ def BetaSpectrum(variables,parameters):
 	return beta(Ke, 0, Mixing, Mass) ### FIXME remove 0 if not passing Q
 # -------------------------------
 # A TF1 object based on the spectrum is needed to generate the expected counts for simulated data
-# Note: this needs to give the counts - i.e. THE INTEGRATED RATE SPECTRUM PER UNIT ENERGY FIXME
 npars = 2						# Num parameters required for our custom function
-betatf1 = TF1('betaspectrum', BetaSpectrum, kemin, kemax, npars)
+betatf1 = TF1('betaspectrum', BetaSpectrum, kemin, kemax, npars) # this is the rate per unit time per unit energy at a given energy
 
 # ===========================================================================================
 # 2. Function for generating fake data spectrum for given mass and mixing angle
@@ -131,33 +132,35 @@ betatf1 = TF1('betaspectrum', BetaSpectrum, kemin, kemax, npars)
 def DataSpectrum(mass,Mixing):	# simulated count spectrum for a given mass and mixing angle
 	### FIXME it would be easier/nicer to step over Sin^2(theta_s) directly than theta_s
 	### so ensure DataSpectrum takes this as an argument
-	betatf1.SetParameters(mass,Mixing)
 
-	spectrumhist = TH1F('spectrum', 'Simulated Data', numbins, kemin, kemax)
-	# method 1: generate a suitable number of 'hits' point by point and bin into a histogram
-	totalcounts = 999999 						# FIXME integrated hits over the whole spectrum, need to calculate this
-	for hit in range(0,totalcounts):
-		KeOfThisHit = betatf1.GetRandom()
-		spectrumhist.Fill(KeOfThisHit)
-	spectrumbuffer = spectrumhist.GetArray()	# this returns a pointer to a ROOT buffer... weird to handle these in Python
-	spectrum=[]
-	for bini in range(0,numbins):				# convert it to a normal list
-		spectrum.append(spectrumbuffer[bini]
-	return spectrum								# return simulated data
+#	# method 1: generate a suitable number of 'hits' point by point and bin into a histogram
+#	spectrumhist = TH1F('spectrum', 'Simulated Data', numkebins, kemin, kemax)
+#	betatf1.SetParameters(mass,Mixing)
+#	for hit in range(0,totalcounts):
+#		KeOfThisHit = betatf1.GetRandom()
+#		spectrumhist.Fill(KeOfThisHit)
+#	spectrumbuffer = spectrumhist.GetArray()				# this returns a pointer to a ROOT buffer
+#	spectrum=[]
+#	for bini in range(0,numkebins):							# convert histogram to a normal list
+#		spectrum.append(spectrumbuffer[bini])
 	
-	# method 2: generate the number of entries in each bin directly, taking into account statistics
-	spectrumnormalisation = 99999				# FIXME is any further normalisation necesary? 
-	for i in range(0,numbins-1):				# spectrum runs from 0.1 to 18.574keV over 100 bins.
-		Ke = kemin + (i/numbins)*(kemax-kemin)	# Ke of this bin centre in eV
-		expectedbincount = betaf1.Eval(Ke)*integrationtime
-		bincontents = np.random.poisson(expectedbincount) # pull from a poisson with mean @ expected. FIXME is binoimial preferable?
-		# normalise if necessary  - need to define totalcounts
-		scaledbincontents = totalcounts*bincontents 	### FIXME necesary? 
-		spectrum.append(scaledbincontents)
+#	# method 2: generate the number of entries in each bin directly, taking into account statistics
+#	kebinwidth = (kemax-kemin)/numkebins
+#	for i in range(0,numkebins-1):							# spectrum runs from 0.1 to 18.574keV over 100 bins.
+#		Ke = kemin + (i/numkebins)*(kemax-kemin)			# Ke of this bin centre in eV
+#		expectedbincount = BetaSpectrum(Ke)*kebinwidth*integrationtime
+#		bincontents = np.random.poisson(expectedbincount)	# pull from a poisson with mean @ expected. Is binoimial preferable?
+#		spectrum.append(bincontents)
 	
-	# method 3: statistical 
-	
-	return spectrum								# return simulated data
+	# method 3: statistical fluctuations in simulated data are not incorporated (...)
+	# so 'data' is exactly the expected number of counts for a given mass, mixing
+	kebinwidth = (kemax-kemin)/numkebins
+	for i in range(0,numkebins-1):							# spectrum runs from 0.1 to 18.574keV over 100 bins.
+		Ke = kemin + i*kebinwidth							# Ke of this bin centre in eV
+		expectedbincount = BetaSpectrum(Ke)*kebinwidth*integrationtime
+		spectrum.append(expectedbincount)					# same as above just skip the Poisson step
+
+	return spectrum											# return simulated data
 
 # ===========================================================================================
 # 3. Function for calculating the chi^2 between a given dataset and the no-sterile hypothesis
