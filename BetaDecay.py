@@ -44,7 +44,9 @@ from ROOT import gROOT, gBenchmark, gRandom, gSystem, Double
 Ns = 1.47e-13					# Total number of emitted electron for KATRIN
 me = 511						# Mass of electron
 kb = 8.76e-5					# Boltzmann radius
-a0 = 2.68e-4;					# Bohr radius
+a0 = 2.68e-4					# Bohr radius
+deltamsq21 = 7.53e-5                            # solar mass splitting 
+deltamsq32 = 2.45e-3                            # atmospheric mass splitting
 numkebins = 100					# number of bins for simulated data
 nummixingangs = 20				# number of steps in mixing angle range scan
 nummasses = 20					# number of steps in mass range scan
@@ -83,22 +85,30 @@ def Ef(Ke): 					# The fermi level of H-3
 	eta = 1/(a0*Momentrum(me, Ke))
 	return 4*np.pi*eta/(1-np.exp(-4*np.pi*eta))
 # -------------------------------
-def beta(Ke,Q,Mixing,Masses): # (NOT DONE)
+def beta(Ke,Q,Mixing,masses): # (NOT DONE)
 	### FIXME
 	### isn't Q a constant? Why is it needed as an argument?
 	### Why is 'Masses' plural? doesn't the spectrum only depend on the (one) sterile mass?
 	
+	m1 = masses[0]
+	m2 = math.sqrt(m1**2 + deltamsq21)
+	m3 = math.sqrt(m2**2 + deltamsq32)
+	Masses = [m1,m2,m3]
+	if len(masses)==2:
+		m4 = masses[1]
+		Masses.append(m4)
+
 
 	rate = Ns*Fermi(Ke)*Energy(me,Ke)*Momentum(me,Ke)
 	
 	sum = 0
 	
-	for pair in len(daughtertable):
+	for excitpair in daughtertable:
 		
 		for (mix,mass) in zip(Mixing,Masses):
-			temp = daughtertable[pair][1]*(Q-daughtertable[pair][0]-Ke) * mix**2 * math.sqrt((Q-daughtertable[pair][0]-Ke)**2 - mass**2)
+			temp = excitpair[1]*(Q-excitpair[0]-Ke) * mix**2 * math.sqrt((Q-excitpair[0]-Ke)**2 - mass**2)
 	
-			if ((Q-daughtertable[pair][0]-Ke) - mass) >= 0.:
+			if ((Q-excitpair[0]-Ke) - mass) >= 0.:
 				sum += temp
 	
 	rate *= sum
