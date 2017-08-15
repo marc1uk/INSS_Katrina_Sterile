@@ -113,36 +113,6 @@ def beta(Ke,Q,Mixing,masses): # (NOT DONE)
 	rate *= sum
 	
 	return rate
-
-
-def betaBACKUP(Ke,Q,Mixing,ms): # (NOT DONE) A backup option of implementing the 3+1 model with keV sterile neutrion.
-    # Mixing element in this function is only U_e4, instead of all other U_ei.
-    
-    Uei = [0.82, 0.54, -0.15] # Declare three U_ei elements.
-	m1 = 0
-	m2 = math.sqrt(m1**2 + deltamsq21)
-	m3 = math.sqrt(m2**2 + deltamsq32)
-	Masses = [m1,m2,m3] # 3-gen masses
-    
-    sin2e4 = Mixing
-    cos2e4 = 1-sin2e4
-   
-	rate = Ns*Fermi(Ke)*Energy(me,Ke)*Momentum(me,Ke)
-	
-	sum = 0
-	
-	for pair in len(daughtertable):
-        
-		for (mix,mass) in zip(Uei,Masses):
-			lightPart = daughtertable[pair][1]*(Q-daughtertable[pair][0]-Ke) * mix**2 * math.sqrt((Q-daughtertable[pair][0]-Ke)**2 - mass**2)
-        ## The sterile component 
-        heavyPart = daughtertable[pair][1]*(Q-daughtertable[pair][0]-Ke)*math.sqrt((Q-daughtertable[pair][0]-Ke)**2 - ms**2)
-
-			if ((Q-daughtertable[pair][0]-Ke) - mass) >= 0.:
-				lightSum += lightPart
-                heavySum += heavyPart
-                
-	rate *= cos2e4*lightSum + sin2e4*heavySum
     
 
 def BetaHist():  # Generate the beta histogram
