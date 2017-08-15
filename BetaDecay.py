@@ -220,6 +220,7 @@ def Chi2FitToNull(nullSpectrum, modelSpectrum):	# Sum the elemental chi2 value.
 def CalculateChi2Matrix:
 	chi2array = []				# make 
 	mixinganglelist = []
+    nullSpectrum = DataSpectrum(-1, 0); # Generate a 3-mixing-only scenario.
 # 4. Loop over a vector of prospective neutrino masses.
 	for i in range(0,nummasses-1):
 		mass = massmin + (i/nummasses)*(massmax-massmin)
@@ -233,7 +234,7 @@ def CalculateChi2Matrix:
 #       - Generate a set of datapoints representing a measured spectrum for that mass and mixing angle.
 			dataset = DataSpectrum(mass, sin2mixang)
 #       - Calculate the chi^2 of the null hypothesis fit to the data
-			chi2 = Chi2FitToNull(dataset)
+			chi2 = Chi2FitToNull(nullSpectrum, dataset)
 #       - Store the result in a vector for this mass.
 			chi2forthismass.append(chi2)
 		# plot the chi2 curve, for checking
