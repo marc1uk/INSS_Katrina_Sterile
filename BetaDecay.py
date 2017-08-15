@@ -107,7 +107,7 @@ def GetPMNS():
 	
 	return Upmns
 
-def beta(Ke,Mixing,m4=-1.):
+def beta(Ke,Mixing,m4=-1.): # (NOT DONE)
 	
 	m2 = math.sqrt(m1**2 + deltamsq21)
 	m3 = math.sqrt(m2**2 + deltamsq32)
@@ -131,37 +131,6 @@ def beta(Ke,Mixing,m4=-1.):
 	rate *= sum
 	
 	return rate
-
-
-def betaBACKUP(Ke,Mixing,ms): # (NOT DONE) A backup option of implementing the 3+1 model with keV sterile neutrion.
-    # Mixing element in this function is only U_e4, instead of all other U_ei.
-    
-    Uei = [0.82, 0.54, -0.15] # Declare three U_ei elements.
-	m1 = 0
-	m2 = math.sqrt(m1**2 + deltamsq21)
-	m3 = math.sqrt(m2**2 + deltamsq32)
-	Masses = [m1,m2,m3] # 3-gen masses
-    
-    sin2e4 = Mixing
-    cos2e4 = 1-sin2e4
-   
-	rate = Ns*Fermi(Ke)*Energy(me,Ke)*Momentum(me,Ke)
-	
-	sum = 0
-	
-	for pair in len(daughtertable):
-        
-		for (mix,mass) in zip(Uei,Masses):
-			lightPart = daughtertable[pair][1]*(Q-daughtertable[pair][0]-Ke) * mix**2 * math.sqrt((Q-daughtertable[pair][0]-Ke)**2 - mass**2)
-        ## The sterile component 
-        heavyPart = daughtertable[pair][1]*(Q-daughtertable[pair][0]-Ke)*math.sqrt((Q-daughtertable[pair][0]-Ke)**2 - ms**2)
-
-			if ((Q-daughtertable[pair][0]-Ke) - mass) >= 0.:
-				lightSum += lightPart
-                heavySum += heavyPart
-                
-	rate *= cos2e4*lightSum + sin2e4*heavySum
-    
 
 def BetaHist():  # Generate the beta histogram
     hist = []    # Declare the content of the histogram
@@ -229,20 +198,19 @@ def DataSpectrum(mass,mixing):	# simulated count spectrum for a given mass and m
 # 3. Function for calculating the chi^2 between a given dataset and the no-sterile hypothesis
 # ===========================================================================================
 def Chi2Test(observe, expect):	# chi2 test for each bin
-    sigma = np.sqrt(expect)
-    return value = (observe**2 - expect**2)/sigma**2
+    value = expect - observe + observe*np.log(observe/expect)
+    return value 
 
 def Chi2TestPoisson(observe, expect): # chi2 test for each bin using the Poisson formula
 	chi2forthispoint = 2* (expect - observe + observe*log(observe/expect))
 	return chi2forthispoint
 
-def Chi2FitToNull(dataSpectrum):	# Sum the elemental chi2 value.
-    nullSpectrum = DataSpectrum(0, 0)
-    assert len(nullSpectrum) == len(dataSpectrum), "The bin numbers of the spectra do not match."    
+def Chi2FitToNull(nullSpectrum, modelSpectrum):	# Sum the elemental chi2 value.
+    assert len(nullSpectrum) == len(modelSpectrum), "The bin numbers of the spectra do not match."    
     summation = 0
-    for i in range (0, len(dataSpectrum)):
-        chi2 = Chi2Test(nullSpectrum[i], dataspectrum[i])
-        summation += chi2
+    for i in range (0, len(modelSpectrum)):
+        chi2 = Chi2Test(nullSpectrum[i], modelSpectrum[i])
+        summation += 2*chi2
     return summation
     
 # ===========================================================================================
