@@ -107,14 +107,15 @@ def GetPMNS():
 	
 	return Upmns
 
-def beta(Ke,Mixing,m4=-1.): # (NOT DONE)
+def beta(Ke,Sinsq14,m4=-1.): # (NOT DONE)
 	
 	m2 = math.sqrt(m1**2 + deltamsq21)
 	m3 = math.sqrt(m2**2 + deltamsq32)
 	Masses = [m1,m2,m3]
 	if m4 >=0.:
 		Masses.append(m4)
-
+	
+	Mixing = [math.cos(theta12)**2 * math.cos(theta13)**2 * (1.-Sinsq14), math.cos(theta13)**2 * math.sin(theta12)**2 * (1.-Sinsq14), math.sin(theta13)**2 * (1.-Sinsq14), Sinsq14]
 
 	rate = Ns*Fermi(Ke)*Energy(me,Ke)*Momentum(me,Ke)
 	
@@ -123,7 +124,7 @@ def beta(Ke,Mixing,m4=-1.): # (NOT DONE)
 	for excitpair in daughtertable:
 		
 		for (mix,mass) in zip(Mixing,Masses):
-			temp = excitpair[1]*(Q-excitpair[0]-Ke) * mix**2 * math.sqrt((Q-excitpair[0]-Ke)**2 - mass**2)
+			temp = excitpair[1]*(Q-excitpair[0]-Ke) * mix * math.sqrt((Q-excitpair[0]-Ke)**2 - mass**2)
 	
 			if ((Q-excitpair[0]-Ke) - mass) >= 0.:
 				sum += temp
