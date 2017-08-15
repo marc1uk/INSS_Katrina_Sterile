@@ -41,28 +41,32 @@ from ROOT import gROOT, gBenchmark, gRandom, gSystem, Double
 # Global constants
 # ===========================================================================================
 # Use eV as as universal unit(?)
-Ns = 1.47e-13					# Total number of emitted electron for KATRIN
-me = 511						# Mass of electron
-kb = 8.76e-5					# Boltzmann radius
-a0 = 2.68e-4					# Bohr radius
-deltamsq21 = 7.53e-5                            # solar mass splitting 
-deltamsq32 = 2.45e-3                            # atmospheric mass splitting
-numkebins = 100					# number of bins for simulated data
-nummixingangs = 20				# number of steps in mixing angle range scan
-nummasses = 20					# number of steps in mass range scan
-kemin = 0						# min of the electron energy spectrum (eV)
-kemax = 18575					# max of the electron energy spectrum (eV)
-mixingangmin = 6				# we'll scan a range of mixings such that sin^2(theta_s)
-mixingangmax = 10				# spans the range 10^-(mixingangmax) -> 10^-(mixingangmin)
-massmin = 1000					# minimum sterile mass (eV)
-massmax = 20000					# maximum sterile mass (eV)
+Ns = 1.47e-13						# Total number of emitted electron for KATRIN
+me = 511							# Mass of electron
+kb = 8.76e-5						# Boltzmann radius
+a0 = 2.68e-4						# Bohr radius
+m1 = 0.								# lightest neutrino mass
+deltamsq21 = 7.53e-5				# solar mass splitting 
+deltamsq32 = 2.45e-3				# atmospheric mass splitting
+theta12 = np.arcsin(np.sqrt(0.297))	# from PDG 2016 mixing review
+theta13 = np.arcsin(np.sqrt(0.216))	# 
+theta23 = np.arcsin(np.sqrt(0.500))	# 
+deltacp = 1.35*np.pi				# 
+Q =  1.47e-13						# Q value for Tritium [s^-1 * eV^-5]
+numkebins = 100						# number of bins for simulated data
+nummixingangs = 20					# number of steps in mixing angle range scan
+nummasses = 20						# number of steps in mass range scan
+kemin = 0							# min of the electron energy spectrum (eV)
+kemax = 18575						# max of the electron energy spectrum (eV)
+mixingangmin = 6					# we'll scan a range of mixings such that sin^2(theta_s)
+mixingangmax = 10					# spans the range 10^-(mixingangmax) -> 10^-(mixingangmin)
+massmin = 1000						# minimum sterile mass (eV)
+massmax = 20000						# maximum sterile mass (eV)
 #alpha = 2.7x10^-3 = 0.0027 for 3 sigma -> chi^2 ~8
-chi2for3sigma = 8				# what chi2 value corresponds to a 3 sigma deviation from the null hypothesis
-integrationtime = 3*360*24*3600 # 3 years of running, assuming spectrum is defined in counts/s FIXME if necessary
-Q = # FIXME						# Energy released in decay
-
-totalrate = 1.47*(10.**-13)		# rate normalisation s^-1 ev^-5. Energy units cancel with Fermi func. (Gf[GeV^2]) such that eV^-1.
-								# or, combined with Matrix Element [GeV^-1] s^-1, |M|^2/F gives [s^-1*eV^-5]
+chi2for3sigma = 8					# what chi2 value corresponds to a 3 sigma deviation from the null hypothesis
+integrationtime = 3*360*24*3600 	# 3 years of running, assuming spectrum is defined in counts/s FIXME if necessary
+totalrate = 1.47*(10.**-13)			# rate normalisation s^-1 ev^-5. Energy units cancel with Fermi func. (Gf[GeV^2]) such that eV^-1.
+									# or, combined with Matrix Element [GeV^-1] s^-1, |M|^2/F gives [s^-1*eV^-5]
 
 #excitationfile = 'HeTtable.csv'
 #with open(excitationfile,'rb') as file:
@@ -86,7 +90,7 @@ def Ef(Ke): 					# The fermi level of H-3
 	eta = 1/(a0*Momentrum(me, Ke))
 	return 4*np.pi*eta/(1-np.exp(-4*np.pi*eta))
 # -------------------------------
-def GetPMNS(theta12,theta13,theta23,deltacp):
+def GetPMNS():
 	Ue1   =  np.cos(theta12)*np.cos(theta13)
 	Ue2   =  np.sin(theta12)*np.cos(theta13)
 	Ue3   =  np.sin(theta13)*cmath.exp(-1j*deltacp)
@@ -103,14 +107,12 @@ def GetPMNS(theta12,theta13,theta23,deltacp):
 	
 	return Upmns
 
-def beta(Ke,Q,Mixing,Masses): # (NOT DONE)
+def beta(Ke,Mixing,m4=-1.):
 	
-	m1 = masses[0]
 	m2 = math.sqrt(m1**2 + deltamsq21)
 	m3 = math.sqrt(m2**2 + deltamsq32)
 	Masses = [m1,m2,m3]
-	if len(masses)==2:
-		m4 = masses[1]
+	if m4 >=0.:
 		Masses.append(m4)
 
 
@@ -131,7 +133,7 @@ def beta(Ke,Q,Mixing,Masses): # (NOT DONE)
 	return rate
 
 
-def betaBACKUP(Ke,Q,Mixing,ms): # (NOT DONE) A backup option of implementing the 3+1 model with keV sterile neutrion.
+def betaBACKUP(Ke,Mixing,ms): # (NOT DONE) A backup option of implementing the 3+1 model with keV sterile neutrion.
     # Mixing element in this function is only U_e4, instead of all other U_ei.
     
     Uei = [0.82, 0.54, -0.15] # Declare three U_ei elements.
@@ -177,9 +179,9 @@ def BetaHist():  # Generate the beta histogram
 # We could do away with this function by suitably defining beta - this is just a wrapper.
 def BetaSpectrum(variables,parameters):
 	Ke = variables[0]
-	Mixing = parameters[0]
-	Mass = parameters[1]
-	return beta(Ke, 0, Mixing, Mass) ### FIXME remove 0 if not passing Q
+	thetae4 = parameters[0]
+	sterilemass = parameters[1]
+	return beta(Ke, thetae4, sterilemass)
 # -------------------------------
 # A TF1 object based on the spectrum is needed to generate the expected counts for simulated data
 npars = 2						# Num parameters required for our custom function
@@ -188,13 +190,13 @@ betatf1 = TF1('betaspectrum', BetaSpectrum, kemin, kemax, npars) # this is the r
 # ===========================================================================================
 # 2. Function for generating fake data spectrum for given mass and mixing angle
 # ===========================================================================================
-def DataSpectrum(mass,Mixing):	# simulated count spectrum for a given mass and mixing angle
+def DataSpectrum(mass,mixing):	# simulated count spectrum for a given mass and mixing angle
 	### FIXME it would be easier/nicer to step over Sin^2(theta_s) directly than theta_s
 	### so ensure DataSpectrum takes this as an argument
 
 #	# method 1: generate a suitable number of 'hits' point by point and bin into a histogram
 #	spectrumhist = TH1F('spectrum', 'Simulated Data', numkebins, kemin, kemax)
-#	betatf1.SetParameters(mass,Mixing)
+#	betatf1.SetParameters(mass,mixing)
 #	for hit in range(0,totalcounts):
 #		KeOfThisHit = betatf1.GetRandom()
 #		spectrumhist.Fill(KeOfThisHit)
@@ -216,7 +218,9 @@ def DataSpectrum(mass,Mixing):	# simulated count spectrum for a given mass and m
 	kebinwidth = (kemax-kemin)/numkebins
 	for i in range(0,numkebins-1):							# spectrum runs from 0.1 to 18.574keV over 100 bins.
 		Ke = kemin + i*kebinwidth							# Ke of this bin centre in eV
-		expectedbincount = ((BetaSpectrum(Ke-(kebinwidth/2))+BetaSpectrum(Ke+(kebinwidth/2)))/2)*kebinwidth*integrationtime
+		parameters = [sterilemass,mixing]
+		expectedbincount = 
+			((BetaSpectrum(Ke-(kebinwidth/2),parameters)+BetaSpectrum(Ke+(kebinwidth/2),parameters))/2)*kebinwidth*integrationtime
 		spectrum.append(expectedbincount)					# same as above just skip the Poisson step
 
 	return spectrum											# return simulated data
