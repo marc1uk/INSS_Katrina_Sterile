@@ -107,15 +107,17 @@ def GetPMNS():
 	
 	return Upmns
 
-def beta(Ke,Sinsq14,m4=-1.): # (NOT DONE)
+def beta(Ke,Sinsq14=0.,m4=-1.): # (NOT DONE)
 	
 	m2 = math.sqrt(m1**2 + deltamsq21)
 	m3 = math.sqrt(m2**2 + deltamsq32)
 	Masses = [m1,m2,m3]
+	Mixing = [math.cos(theta12)**2 * math.cos(theta13)**2 * (1.-Sinsq14), math.cos(theta13)**2 * math.sin(theta12)**2 * (1.-Sinsq14), math.sin(theta13)**2 * (1.-Sinsq14)]
 	if m4 >=0.:
 		Masses.append(m4)
+		Mixing.append(Sinsq14)
 	
-	Mixing = [math.cos(theta12)**2 * math.cos(theta13)**2 * (1.-Sinsq14), math.cos(theta13)**2 * math.sin(theta12)**2 * (1.-Sinsq14), math.sin(theta13)**2 * (1.-Sinsq14), Sinsq14]
+
 
 	rate = Ns*Fermi(Ke)*Energy(me,Ke)*Momentum(me,Ke)
 	
