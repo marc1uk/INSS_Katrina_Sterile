@@ -45,8 +45,10 @@ Ns = 1.47e-13					# Total number of emitted electron for KATRIN
 me = 511						# Mass of electron
 kb = 8.76e-5					# Boltzmann radius
 a0 = 2.68e-4					# Bohr radius
+m1 = 0.                                         # lightest neutrino mass
 deltamsq21 = 7.53e-5                            # solar mass splitting 
 deltamsq32 = 2.45e-3                            # atmospheric mass splitting
+Q =  1.47e-13                                   # Q value for Tritium [s^-1 * eV^-5]
 numkebins = 100					# number of bins for simulated data
 nummixingangs = 20				# number of steps in mixing angle range scan
 nummasses = 20					# number of steps in mass range scan
@@ -85,17 +87,15 @@ def Ef(Ke): 					# The fermi level of H-3
 	eta = 1/(a0*Momentrum(me, Ke))
 	return 4*np.pi*eta/(1-np.exp(-4*np.pi*eta))
 # -------------------------------
-def beta(Ke,Q,Mixing,masses): # (NOT DONE)
+def beta(Ke,Q,Mixing,m4=-1.): # (NOT DONE)
 	### FIXME
 	### isn't Q a constant? Why is it needed as an argument?
 	### Why is 'Masses' plural? doesn't the spectrum only depend on the (one) sterile mass?
 	
-	m1 = masses[0]
 	m2 = math.sqrt(m1**2 + deltamsq21)
 	m3 = math.sqrt(m2**2 + deltamsq32)
 	Masses = [m1,m2,m3]
-	if len(masses)==2:
-		m4 = masses[1]
+	if m4 >=0.:
 		Masses.append(m4)
 
 
