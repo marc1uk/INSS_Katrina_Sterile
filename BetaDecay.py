@@ -98,7 +98,6 @@ def beta(Ke,Q,Mixing,masses): # (NOT DONE)
 		m4 = masses[1]
 		Masses.append(m4)
 
-
 	rate = Ns*Fermi(Ke)*Energy(me,Ke)*Momentum(me,Ke)
 	
 	sum = 0
@@ -213,12 +212,11 @@ def Chi2Test(observe, expect):	# chi2 test for each bin
     value = expect - observe + observe*np.log(observe/expect)
     return value 
 
-def Chi2FitToNull(dataSpectrum):	# Sum the elemental chi2 value.
-    nullSpectrum = DataSpectrum(0, 0)
-    assert len(nullSpectrum) == len(dataSpectrum), "The bin numbers of the spectra do not match."    
+def Chi2FitToNull(nullSpectrum, modelSpectrum):	# Sum the elemental chi2 value.
+    assert len(nullSpectrum) == len(modelSpectrum), "The bin numbers of the spectra do not match."    
     summation = 0
-    for i in range (0, len(dataSpectrum)):
-        chi2 = Chi2Test(nullSpectrum[i], dataspectrum[i]) ### XXX fixed to pass as 2 args rather than passing diff
+    for i in range (0, len(modelSpectrum)):
+        chi2 = Chi2Test(nullSpectrum[i], modelSpectrum[i]) ### XXX fixed to pass as 2 args rather than passing diff
         summation += 2*chi2
     return summation
     
