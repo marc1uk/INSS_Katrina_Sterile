@@ -59,14 +59,15 @@ massmax = 20000					# maximum sterile mass (eV)
 #alpha = 2.7x10^-3 = 0.0027 for 3 sigma -> chi^2 ~8
 chi2for3sigma = 8				# what chi2 value corresponds to a 3 sigma deviation from the null hypothesis
 integrationtime = 3*360*24*3600 # 3 years of running, assuming spectrum is defined in counts/s FIXME if necessary
+Q = # FIXME						# Energy released in decay
 
-totalrate = 1.47*(10.**-13)		# total rate in counts second^-1 eV^-5???
-totalcounts = totalrate * integrationtime * (kemax*kemin) # FIXME
+totalrate = 1.47*(10.**-13)		# rate normalisation s^-1 ev^-5. Energy units cancel with Fermi func. (Gf[GeV^2]) such that eV^-1.
+								# or, combined with Matrix Element [GeV^-1] s^-1, |M|^2/F gives [s^-1*eV^-5]
 
-excitationfile = 'HeTtable.csv'
-with open(excitationfile,'rb') as file:
-	reader = csv.reader(f,quoting=csv.QUOTE_NONNUMERIC)
-	daughthertable = list(reader)
+#excitationfile = 'HeTtable.csv'
+#with open(excitationfile,'rb') as file:
+#	reader = csv.reader(f,quoting=csv.QUOTE_NONNUMERIC)
+#	daughthertable = list(reader)
 # ===========================================================================================
 # 1. Function for representing the tritium beta decay spectrum, including a potential sterile
 # ===========================================================================================
@@ -85,10 +86,24 @@ def Ef(Ke): 					# The fermi level of H-3
 	eta = 1/(a0*Momentrum(me, Ke))
 	return 4*np.pi*eta/(1-np.exp(-4*np.pi*eta))
 # -------------------------------
-def beta(Ke,Q,Mixing,masses): # (NOT DONE)
-	### FIXME
-	### isn't Q a constant? Why is it needed as an argument?
-	### Why is 'Masses' plural? doesn't the spectrum only depend on the (one) sterile mass?
+def GetPMNS(theta12,theta13,theta23,deltacp):
+	Ue1   =  np.cos(theta12)*np.cos(theta13)
+	Ue2   =  np.sin(theta12)*np.cos(theta13)
+	Ue3   =  np.sin(theta13)*cmath.exp(-1j*deltacp)
+	Umu1  = -np.sin(theta12)*np.cos(theta23) - np.cos(theta12)*np.sin(theta23)*np.sin(theta13)*exp(-1j*deltacp)
+	Umu2  =  np.cos(theta12)*np.cos(theta23) - np.sin(theta12)*np.sin(theta23)*np.sin(theta13)*exp(-1j*deltacp)
+	Umu3  =  np.sin(theta23)*np.cos(theta13)
+	Utau1 =  np.sin(theta12)*np.sin(theta23) - np.cos(theta12)*np.cos(theta23)*np.sin(theta13)*exp(-1j*deltacp)
+	Utau2 = -np.cos(theta12)*np.sin(theta23) - np.sin(theta12)*np.cos(theta23)*np.sin(theta13)*exp(-1j*deltacp)
+	Utau3 =  np.cos(theta23)*np.cos(theta13)
+	
+	Upmns= [[Ue1   ,  Ue2   ,  Ue3   ],
+			[Umu1  ,  Umu2  ,  Umu3  ],
+			[Utau1 ,  Utau2 ,  Utau3 ]]
+	
+	return Upmns
+
+def beta(Ke,Q,Mixing,Masses): # (NOT DONE)
 	
 	m1 = masses[0]
 	m2 = math.sqrt(m1**2 + deltamsq21)
@@ -201,7 +216,7 @@ def DataSpectrum(mass,Mixing):	# simulated count spectrum for a given mass and m
 	kebinwidth = (kemax-kemin)/numkebins
 	for i in range(0,numkebins-1):							# spectrum runs from 0.1 to 18.574keV over 100 bins.
 		Ke = kemin + i*kebinwidth							# Ke of this bin centre in eV
-		expectedbincount = BetaSpectrum(Ke)*kebinwidth*integrationtime
+		expectedbincount = ((BetaSpectrum(Ke-(kebinwidth/2))+BetaSpectrum(Ke+(kebinwidth/2)))/2)*kebinwidth*integrationtime
 		spectrum.append(expectedbincount)					# same as above just skip the Poisson step
 
 	return spectrum											# return simulated data
@@ -213,12 +228,16 @@ def Chi2Test(observe, expect):	# chi2 test for each bin
     sigma = np.sqrt(expect)
     return value = (observe**2 - expect**2)/sigma**2
 
+def Chi2TestPoisson(observe, expect): # chi2 test for each bin using the Poisson formula
+	chi2forthispoint = 2* (expect - observe + observe*log(observe/expect))
+	return chi2forthispoint
+
 def Chi2FitToNull(dataSpectrum):	# Sum the elemental chi2 value.
     nullSpectrum = DataSpectrum(0, 0)
     assert len(nullSpectrum) == len(dataSpectrum), "The bin numbers of the spectra do not match."    
     summation = 0
     for i in range (0, len(dataSpectrum)):
-        chi2 = Chi2Test(nullSpectrum[i], dataspectrum[i]) ### XXX fixed to pass as 2 args rather than passing diff
+        chi2 = Chi2Test(nullSpectrum[i], dataspectrum[i])
         summation += chi2
     return summation
     
