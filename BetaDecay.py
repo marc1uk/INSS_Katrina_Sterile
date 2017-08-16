@@ -54,7 +54,7 @@ theta23 = np.arcsin(np.sqrt(0.500))	#
 deltacp = 1.35*np.pi				# 
 Q = 18571.8							# Q value for Tritium [eV]
 numkebins = 100						# number of bins for simulated data
-nummixingangs = 20					# number of steps in mixing angle range scan
+nummixingangs = 10					# number of steps in mixing angle range scan
 nummasses = 20						# number of steps in mass range scan
 kemin = 1.							# min of the electron energy spectrum [eV]
 kemax = 18575.						# max of the electron energy spectrum [eV]
@@ -280,12 +280,13 @@ def CalculateChi2Matrix():
 # 5. Implement a function that takes the results and produces a contour plot. Results are stored in
 #    a matrix, where each row stores the range of mixing angles that are consistent with
 #    the null hypothesis at that mass
-def MakeContourPlots(masses, mixings, chi2vals):
+def MakeContourPlots(mixings, masses, chi2vals, contourlimits):
 	matplotlib.pyplot.figure()
-	contourplot = matplotlib.pyplot.contourf(masses, mixings, chi2vals, chi2for3sigma) # contour gives lines, contourf fills
+	contourplot = matplotlib.pyplot.contourf(mixings, masses, chi2vals, contourlimits) # contour gives lines, contourf fills
 	matplotlib.pyplot.title('3 Sigma Exclusion Limits over 3 Years, Statistical Only')
-	matplotlib.pyplot.xlabel('Sterile Mass (eV)')
-	matplotlib.pyplot.ylabel('Sterile-Electron Mixing Angle (rads)')
+	matplotlib.pyplot.xlabel('Sterile-Electron Mixing Angle (rads)')
+	matplotlib.pyplot.ylabel('Sterile Mass (eV)')
+	matplotlib.pyplot.yscale('log')
 	matplotlib.pyplot.show()
 
 # ===========================================================================================
@@ -297,7 +298,11 @@ def main():
 #	thismassplot = matplotlib.pyplot.plot(nullSpectrum) # visual check of spectrum
 #	matplotlib.pyplot.show()
 	chi2array, masslist, mixinganglelist = CalculateChi2Matrix()
-	MakeContourPlots(masslist, mixinganglelist, chi2array)
+	chi2array2 = np.array(chi2array)
+	chi2arraytranspose = chi2array2.transpose()
+	chi2limits = [2.30,4.61,5.99,6.18,9.21]
+	# 1 - 5 sigma for 2 DOF
+	MakeContourPlots(mixinganglelist, masslist, chi2array, chi2limits )
 	# wait for input to keep the plot alive. 
 	if __name__ == '__main__':
 		rep = ''
@@ -307,3 +312,27 @@ def main():
 				rep = rep[0]
 
 main()
+a
+# a function to generate a plot of the effect on the beta spectrum, using artificially large mixing to enhance visibility
+#def effectPlot():
+#	matplotlib.pyplot.figure()
+#	nullSpectrum = DataSpectrum(-1, 0); # Generate a 3-mixing-only scenario.
+#	anexamplespectrum = DataSpectrum(2000, 0.2)
+#	nullplot = matplotlib.pyplot.plot(nullSpectrum)
+#	sterileplot = matplotlib.pyplot.plot(anexamplespectrum)
+#	matplotlib.pyplot.title('Effect of a 2keV Sterile with Artificially Large Mixing')
+#	matplotlib.pyplot.xlabel('Electron Energy (eV)')
+#	matplotlib.pyplot.ylabel('Rate per unit Energy ($s^-1 eV^-1$)')
+#	matplotlib.pyplot.show()
+#	
+# a function 
+#def ratioPlot():
+#	matplotlib.pyplot.figure()
+#	nullSpectrum = DataSpectrum(-1, 0); # Generate a 3-mixing-only scenario.
+#	anexamplespectrum = DataSpectrum(2000, 0.2)
+#	nullplot = matplotlib.pyplot.plot(nullSpectrum)
+#	sterileplot = matplotlib.pyplot.plot(anexamplespectrum)
+#	matplotlib.pyplot.title('Effect of a 2keV Sterile with Artificially Large Mixing')
+#	matplotlib.pyplot.xlabel('Electron Energy (eV)')
+#	matplotlib.pyplot.ylabel('Rate per unit Energy ($s^-1 eV^-1$)')
+#	matplotlib.pyplot.show()
