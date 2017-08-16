@@ -48,16 +48,20 @@ a0 = 2.68e-4						# Bohr radius [fm]
 m1 = 0.								# lightest neutrino mass [eV]
 deltamsq21 = 7.53e-5				# solar mass splitting 
 deltamsq32 = 2.45e-3				# atmospheric mass splitting
+m2 = math.sqrt(m1**2 + deltamsq21)
+m3 = math.sqrt(m2**2 + deltamsq32)
+ActiveMasses = [m1,m2,m3]
 theta12 = np.arcsin(np.sqrt(0.297))	# from PDG 2016 mixing review
 theta13 = np.arcsin(np.sqrt(0.216))	# 
 theta23 = np.arcsin(np.sqrt(0.500))	# 
 deltacp = 1.35*np.pi				# 
 Q = 18571.8							# Q value for Tritium [eV]
 numkebins = 100						# number of bins for simulated data
-nummixingangs = 10					# number of steps in mixing angle range scan
+nummixingangs = 30					# number of steps in mixing angle range scan
 nummasses = 20						# number of steps in mass range scan
 kemin = 1.							# min of the electron energy spectrum [eV]
-kemax = 18575.						# max of the electron energy spectrum [eV]
+kemax = Q							# max of the electron energy spectrum [eV]
+kelist = []
 mixingangmin = 6					# we'll scan a range of mixings such that sin^2(theta_s)
 mixingangmax = 10					# spans the range 10^-(mixingangmax) -> 10^-(mixingangmin)
 massmin = 1000.						# minimum sterile mass (eV)
@@ -106,12 +110,10 @@ def GetPMNS():
 	return Upmns
 
 def beta(Ke,Sinsq14=0.,m4=-1.):
-	m2 = math.sqrt(m1**2 + deltamsq21)
-	m3 = math.sqrt(m2**2 + deltamsq32)
-	Masses = [m1,m2,m3]
 	Mixing = [math.cos(theta12)**2 * math.cos(theta13)**2 * (1.-Sinsq14), math.cos(theta13)**2 * math.sin(theta12)**2 * (1.-Sinsq14), math.sin(theta13)**2 * (1.-Sinsq14)]
-	if m4 >=0.:
-		Masses.append(m4)
+	Masses = []
+	if Sinsq14 >=0.:
+		Masses = ActiveMasses + [m4]
 		Mixing.append(Sinsq14)
 	
 	rate = Ns*Fermi(me,Ke)*Energy(me,Ke)*Momentum(me,Ke)
@@ -121,7 +123,7 @@ def beta(Ke,Sinsq14=0.,m4=-1.):
 	for excitpair in daughtertable:
 		
 		for (mix,mass) in zip(Mixing,Masses):
-			if ((Q-excitpair[0]-Ke) - mass) >= 0.:
+			if ((Q-excitpair[0]-Ke) - mass) >= 0. and ((Q-excitpair[0]-Ke)**2 - mass**2) > 0:
 				temp = excitpair[1]*(Q-excitpair[0]-Ke) * mix * math.sqrt((Q-excitpair[0]-Ke)**2 - mass**2)
 				asum += temp
 	
@@ -180,8 +182,10 @@ def DataSpectrum(mass,mixing):	# simulated count spectrum for a given mass and m
 	# method 3: statistical fluctuations in simulated data are not incorporated (...)
 	# so 'data' is exactly the expected number of counts for a given mass, mixing
 	kebinwidth = (kemax-kemin)/numkebins
-	for i in range(0,numkebins-1):							# spectrum runs from 0.1 to 18.574keV over 100 bins.
-		Ke = kemin + i*kebinwidth							# Ke of this bin centre in eV
+	for i in range(0,numkebins+1):							# spectrum runs from 0.1 to 18.574keV over 100 bins.
+		Ke = kemin + (1.*i)*kebinwidth							# Ke of this bin centre in eV
+		if (len(kelist)!=(numkebins+1)):
+			kelist.append(Ke)
 		parameters = [mixing,mass]
 		expectedbincount = BetaSpectrum([Ke],parameters)*kebinwidth*integrationtime
 		spectrum.append(expectedbincount)					# same as above just skip the Poisson step
@@ -191,20 +195,41 @@ def DataSpectrum(mass,mixing):	# simulated count spectrum for a given mass and m
 # ===========================================================================================
 # 3. Function for calculating the chi^2 between a given dataset and the no-sterile hypothesis
 # ===========================================================================================
-def Chi2Test(observe, expect):	# chi2 test for each bin
-    value = expect - observe + observe*np.log(observe/expect)
-    return value 
+def Chi2Test(observe, expect):								# chi2 test for each bin
+     sigma = np.sqrt(expect)
+     value=0
+     if (sigma):
+         value = (observe**2 - expect**2)/sigma**2
+     return value
 
-def Chi2TestPoisson(observe, expect): # chi2 test for each bin using the Poisson formula
-	chi2forthispoint = 2* (expect - observe + observe*log(observe/expect))
+def Chi2TestPoisson(observe, expect):						# chi2 test for each bin using the Poisson formula
+	if (observe == 0) or (expect == 0):
+		return 0
+	chi2forthispoint = 2.* (expect - observe + observe*np.log(observe/expect))
+#	if(chi2forthispoint<0):
+#		print "\nOH NO, CHI2<0! expect=" + str(expect) + ", observe=" + str(observe),
+#		print ", observe/expect=" + str(observe/expect) + "log(o/e)=" + str(np.log(observe/expect)),
+#		print ", observe(1+log(o/e))=" + str(observe*(1+np.log(observe/expect))) + ", chi2 =" + str(chi2forthispoint) + "\n"
 	return chi2forthispoint
 
-def Chi2FitToNull(nullSpectrum, modelSpectrum):	# Sum the elemental chi2 value.
+def Chi2FitToNull(nullSpectrum, modelSpectrum):				# Sum the elemental chi2 value.
     assert len(nullSpectrum) == len(modelSpectrum), "The bin numbers of the spectra do not match."    
     summation = 0
     for i in range (0, len(modelSpectrum)):
         chi2 = Chi2Test(nullSpectrum[i], modelSpectrum[i])
-        summation += 2*chi2
+        summation += chi2
+    return summation
+
+def Chi2FitToNullIntegral(nullSpectrum, modelSpectrum):			# Sum the elemental chi2 value. Counts based on retarding potl.
+    assert len(nullSpectrum) == len(modelSpectrum), "The bin numbers of the spectra do not match."    
+    summation = 0
+    nullintegral=0
+    modelintegral=0
+    for i in range (0, len(modelSpectrum)):
+        nullintegral+=nullSpectrum[numkebins-i]
+        modelintegral+=modelSpectrum[numkebins-i]
+        chi2 = Chi2Test(nullintegral, modelintegral)
+        summation += chi2
     return summation
     
 # ===========================================================================================
@@ -214,14 +239,15 @@ def CalculateChi2Matrix():
 	chi2array = []		# matrix of chi2. rows are masses, columns are mixing angles
 	mixinganglelist = []
 	masslist = []
-	nullSpectrum = DataSpectrum(-1, 0) # Generate a 3-mixing-only scenario
+	nullSpectrum = DataSpectrum(0, 0) # Generate a 3-mixing-only scenario
 # 4. Loop over a vector of prospective neutrino masses.
-	matplotlib.pyplot.figure()
-	for i in range(0,nummasses-1):
+
+#	matplotlib.pyplot.figure()
+	for i in range(0,nummasses+1):
 		mass = massmin + ((1.*i)/nummasses)*(massmax-massmin)
 		chi2forthismass = []
 #    +  Loop over a vector of prospective mixing angles.
-		for j in range(0,nummixingangs-1):
+		for j in range(0,nummixingangs+1):
 			power = mixingangmin + ((j*1.)/nummixingangs)*(mixingangmax-mixingangmin)
 			sin2mixang = 10 ** -power
 			print "mass = " + str(mass) + ", sin2mixang = " + str(sin2mixang)
@@ -232,28 +258,35 @@ def CalculateChi2Matrix():
 #       - Generate a set of datapoints representing a measured spectrum for that mass and mixing angle.
 			dataset = DataSpectrum(mass, sin2mixang)
 			
-#			# to take the difference we need to convert to np arrays
-#			dsa = np.array(nullSpectrum)
-#			na = np.array(dataset)
-#			diffarray = dsa-na
-#			diffplot = matplotlib.pyplot.plot(diffarray)
-#			title = "MC for sterile with mass " + str(mass) + " and sin2thetae4 " + str(sin2mixang)
+			# to take the difference we need to convert to np arrays
+#			nullarray = np.array(nullSpectrum)
+#			datasetarray = np.array(dataset)
+#			matplotlib.pyplot.plot(nullarray,'k-',label='null')
+#			matplotlib.pyplot.plot(datasetarray,color='b',linestyle='dashed',label='data')
+#			matplotlib.pyplot.show()
+#			matplotlib.pyplot.figure()
+#			ratioarray = datasetarray/nullarray
+#			ratioplot = matplotlib.pyplot.plot(kelist,ratioarray,label=str(sin2mixang))
+#			title = "Sterile/Null for mass " + str(mass)# + " and sin2thetae4 " + str(sin2mixang)
 #			matplotlib.pyplot.title(title)
+#			matplotlib.pyplot.ylim([0.999999,1.0000001])
+#			matplotlib.pyplot.show()
 			
 #       - Calculate the chi^2 of the null hypothesis fit to the data
-			chi2 = Chi2FitToNull(nullSpectrum, dataset)
+			chi2 = Chi2FitToNullIntegral(nullSpectrum, dataset)
 #       - Store the result in a vector for this mass.
 			chi2forthismass.append(chi2)
-#		matplotlib.pyplot.show() # will halt until closed
+		#matplotlib.pyplot.show() # will halt until closed
 		# plot the chi2 curve, for checking
-		thismassplot = matplotlib.pyplot.plot(mixinganglelist,chi2forthismass)
+#		thismassplot = matplotlib.pyplot.plot(mixinganglelist,chi2forthismass,label=str(mass))
 #		matplotlib.pyplot.title('Chi2 vs Mixing Angle for Mass ' + str(mass))
 #		matplotlib.pyplot.xlabel('Sin^2 Mixing angle')
 #		matplotlib.pyplot.ylabel('Chi2')
 #		matplotlib.pyplot.show()
 		# turns out to draw contours we can just use the curves directly, we don't need to find the values at 3 sigma
 		chi2array.append(chi2forthismass)
-	matplotlib.pyplot.show()
+#	matplotlib.pyplot.legend()
+#	matplotlib.pyplot.show()
 	return chi2array, masslist, mixinganglelist
 # Obselete code, originally to fit a polynomial to the range of chi2's and find the mixing angles where chi2 corresponds to 3 sigma
 #		# TGraph takes array.array datatypes, so we need to convert from python lists
@@ -286,7 +319,8 @@ def MakeContourPlots(mixings, masses, chi2vals, contourlimits):
 	matplotlib.pyplot.title('3 Sigma Exclusion Limits over 3 Years, Statistical Only')
 	matplotlib.pyplot.xlabel('Sterile-Electron Mixing Angle (rads)')
 	matplotlib.pyplot.ylabel('Sterile Mass (eV)')
-	matplotlib.pyplot.yscale('log')
+	matplotlib.pyplot.xscale('log')
+	matplotlib.pyplot.clabel(contourplot, inline=1, fontsize=10)
 	matplotlib.pyplot.show()
 
 # ===========================================================================================
@@ -294,7 +328,7 @@ def MakeContourPlots(mixings, masses, chi2vals, contourlimits):
 # ===========================================================================================
 def main():
 	print "doing main"
-#	nullSpectrum = DataSpectrum(-1, 0); # Generate a 3-mixing-only scenario.
+#	nullSpectrum = DataSpectrum(0, 0); # Generate a 3-mixing-only scenario.
 #	thismassplot = matplotlib.pyplot.plot(nullSpectrum) # visual check of spectrum
 #	matplotlib.pyplot.show()
 	chi2array, masslist, mixinganglelist = CalculateChi2Matrix()
@@ -302,37 +336,43 @@ def main():
 	chi2arraytranspose = chi2array2.transpose()
 	chi2limits = [2.30,4.61,5.99,6.18,9.21]
 	# 1 - 5 sigma for 2 DOF
-	MakeContourPlots(mixinganglelist, masslist, chi2array, chi2limits )
-	# wait for input to keep the plot alive. 
-	if __name__ == '__main__':
-		rep = ''
-		while not rep in [ 'q', 'Q' ]:
-			rep = raw_input( 'enter "q" to quit: ' )
-			if 1 < len(rep):
-				rep = rep[0]
+	MakeContourPlots(mixinganglelist, masslist, chi2array, 5 )
+#	# wait for input to keep the plot alive - not necessary, it waits for you anyway.
+#	if __name__ == '__main__':
+#		rep = ''
+#		while not rep in [ 'q', 'Q' ]:
+#			rep = raw_input( 'enter "q" to quit: ' )
+#			if 1 < len(rep):
+#				rep = rep[0]
 
 main()
-a
+
 # a function to generate a plot of the effect on the beta spectrum, using artificially large mixing to enhance visibility
-#def effectPlot():
-#	matplotlib.pyplot.figure()
-#	nullSpectrum = DataSpectrum(-1, 0); # Generate a 3-mixing-only scenario.
-#	anexamplespectrum = DataSpectrum(2000, 0.2)
-#	nullplot = matplotlib.pyplot.plot(nullSpectrum)
-#	sterileplot = matplotlib.pyplot.plot(anexamplespectrum)
-#	matplotlib.pyplot.title('Effect of a 2keV Sterile with Artificially Large Mixing')
-#	matplotlib.pyplot.xlabel('Electron Energy (eV)')
-#	matplotlib.pyplot.ylabel('Rate per unit Energy ($s^-1 eV^-1$)')
-#	matplotlib.pyplot.show()
-#	
-# a function 
-#def ratioPlot():
-#	matplotlib.pyplot.figure()
-#	nullSpectrum = DataSpectrum(-1, 0); # Generate a 3-mixing-only scenario.
-#	anexamplespectrum = DataSpectrum(2000, 0.2)
-#	nullplot = matplotlib.pyplot.plot(nullSpectrum)
-#	sterileplot = matplotlib.pyplot.plot(anexamplespectrum)
-#	matplotlib.pyplot.title('Effect of a 2keV Sterile with Artificially Large Mixing')
-#	matplotlib.pyplot.xlabel('Electron Energy (eV)')
-#	matplotlib.pyplot.ylabel('Rate per unit Energy ($s^-1 eV^-1$)')
-#	matplotlib.pyplot.show()
+def effectPlot():
+	matplotlib.pyplot.figure()
+	nullSpectrum = DataSpectrum(0, 0); # Generate a 3-mixing-only scenario.
+	anexamplespectrum = DataSpectrum(10000, 0.2)
+	nullplot = matplotlib.pyplot.plot(kelist,nullSpectrum, label='no sterile')
+	sterileplot = matplotlib.pyplot.plot(kelist,anexamplespectrum, label='with sterile')
+	matplotlib.pyplot.title('Effect of a 10keV Sterile with Artificially Large Mixing')
+	matplotlib.pyplot.xlabel('Electron Energy (eV)')
+	matplotlib.pyplot.ylabel('Rate per unit Energy ($s^-1 eV^-1$)')
+	matplotlib.pyplot.legend()
+	matplotlib.pyplot.show()
+	
+# a function to plot the ratio for a realistic pair of values to show the shape
+def ratioPlot():
+	matplotlib.pyplot.figure()
+	nullSpectrum = DataSpectrum(0, 0); # Generate a 3-mixing-only scenario.
+	nullSpectrumArray = np.array(nullSpectrum)
+	exampleSpectrum = DataSpectrum(10000, 10**-8)
+	exampleSpectrumArray = np.array(exampleSpectrum)
+	ratiospectrum = exampleSpectrumArray/nullSpectrumArray
+	ratioplot = matplotlib.pyplot.plot(kelist,ratiospectrum)
+	matplotlib.pyplot.title('Effect of a 2keV Sterile with')
+	matplotlib.pyplot.xlabel('Electron Energy (eV)')
+	matplotlib.pyplot.ylabel('Ratio of Rates with and Without Sterile ($s^-1 eV^-1$)')
+	matplotlib.pyplot.show()
+	
+#effectPlot()
+#ratioPlot()
