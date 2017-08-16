@@ -1,6 +1,6 @@
 # vim:set noexpandtab tabstop=4 wrap
 import numpy as np
-import pylab as P
+#import pylab as P
 import math 
 import matplotlib.pyplot
 import os, sys, csv
@@ -41,37 +41,35 @@ from ROOT import gROOT, gBenchmark, gRandom, gSystem, Double
 # Global constants
 # ===========================================================================================
 # Use eV as as universal unit(?)
-Ns = 1.47e-13						# Total number of emitted electron for KATRIN
-me = 511							# Mass of electron
-kb = 8.76e-5						# Boltzmann radius
-a0 = 2.68e-4						# Bohr radius
-m1 = 0.								# lightest neutrino mass
+Ns = 1.47e-13						# Rate normalisation, value for Katrin. [s^-1 ev^-5]
+me = 511000							# Mass of electron [eV]
+kb = 8.76e-5						# Boltzmann constant [eV K^-1]
+a0 = 2.68e-4						# Bohr radius [fm]
+m1 = 0.								# lightest neutrino mass [eV]
 deltamsq21 = 7.53e-5				# solar mass splitting 
 deltamsq32 = 2.45e-3				# atmospheric mass splitting
 theta12 = np.arcsin(np.sqrt(0.297))	# from PDG 2016 mixing review
 theta13 = np.arcsin(np.sqrt(0.216))	# 
 theta23 = np.arcsin(np.sqrt(0.500))	# 
 deltacp = 1.35*np.pi				# 
-Q =  1.47e-13						# Q value for Tritium [s^-1 * eV^-5]
+Q = 18571.8							# Q value for Tritium [eV]
 numkebins = 100						# number of bins for simulated data
 nummixingangs = 20					# number of steps in mixing angle range scan
 nummasses = 20						# number of steps in mass range scan
-kemin = 0							# min of the electron energy spectrum (eV)
-kemax = 18575						# max of the electron energy spectrum (eV)
+kemin = 1.							# min of the electron energy spectrum [eV]
+kemax = 18575.						# max of the electron energy spectrum [eV]
 mixingangmin = 6					# we'll scan a range of mixings such that sin^2(theta_s)
 mixingangmax = 10					# spans the range 10^-(mixingangmax) -> 10^-(mixingangmin)
-massmin = 1000						# minimum sterile mass (eV)
-massmax = 20000						# maximum sterile mass (eV)
+massmin = 1000.						# minimum sterile mass (eV)
+massmax = 20000.					# maximum sterile mass (eV)
 #alpha = 2.7x10^-3 = 0.0027 for 3 sigma -> chi^2 ~8
 chi2for3sigma = 8					# what chi2 value corresponds to a 3 sigma deviation from the null hypothesis
 integrationtime = 3*360*24*3600 	# 3 years of running, assuming spectrum is defined in counts/s FIXME if necessary
-totalrate = 1.47*(10.**-13)			# rate normalisation s^-1 ev^-5. Energy units cancel with Fermi func. (Gf[GeV^2]) such that eV^-1.
-									# or, combined with Matrix Element [GeV^-1] s^-1, |M|^2/F gives [s^-1*eV^-5]
 
-#excitationfile = 'HeTtable.csv'
-#with open(excitationfile,'rb') as file:
-#	reader = csv.reader(f,quoting=csv.QUOTE_NONNUMERIC)
-#	daughthertable = list(reader)
+excitationfile = 'HeTtable.csv'
+with open(excitationfile,'rb') as file:
+	reader = csv.reader(file,quoting=csv.QUOTE_NONNUMERIC)
+	daughtertable = list(reader)
 # ===========================================================================================
 # 1. Function for representing the tritium beta decay spectrum, including a potential sterile
 # ===========================================================================================
@@ -83,11 +81,11 @@ def Energy(mass,Ke):			# Energy of electron
 def Momentum(mass,Ke):			# Momentum of electrom
 	return math.sqrt(Energy(mass,Ke)**2 - mass**2)
 # -------------------------------
-def Fermi(Ke):					# The fermi function
-	return 1/(1+np.exp(Ke+mass-Ef(Ke))/Ke*kb))
+def Fermi(mass,Ke):					# The fermi function
+	return (1/(1+np.exp((Ke-Ef(Ke))/((2./3.)*Ke))))
 # -------------------------------
 def Ef(Ke): 					# The fermi level of H-3
-	eta = 1/(a0*Momentrum(me, Ke))
+	eta = 1/(a0*Momentum(me, Ke))
 	return 4*np.pi*eta/(1-np.exp(-4*np.pi*eta))
 # -------------------------------
 def GetPMNS():
@@ -107,8 +105,7 @@ def GetPMNS():
 	
 	return Upmns
 
-def beta(Ke,Sinsq14=0.,m4=-1.): # (NOT DONE)
-	
+def beta(Ke,Sinsq14=0.,m4=-1.):
 	m2 = math.sqrt(m1**2 + deltamsq21)
 	m3 = math.sqrt(m2**2 + deltamsq32)
 	Masses = [m1,m2,m3]
@@ -117,43 +114,40 @@ def beta(Ke,Sinsq14=0.,m4=-1.): # (NOT DONE)
 		Masses.append(m4)
 		Mixing.append(Sinsq14)
 	
-
-
-	rate = Ns*Fermi(Ke)*Energy(me,Ke)*Momentum(me,Ke)
+	rate = Ns*Fermi(me,Ke)*Energy(me,Ke)*Momentum(me,Ke)
 	
-	sum = 0
+	asum = 0
 	
 	for excitpair in daughtertable:
 		
 		for (mix,mass) in zip(Mixing,Masses):
-			temp = excitpair[1]*(Q-excitpair[0]-Ke) * mix * math.sqrt((Q-excitpair[0]-Ke)**2 - mass**2)
-	
 			if ((Q-excitpair[0]-Ke) - mass) >= 0.:
-				sum += temp
+				temp = excitpair[1]*(Q-excitpair[0]-Ke) * mix * math.sqrt((Q-excitpair[0]-Ke)**2 - mass**2)
+				asum += temp
 	
-	rate *= sum
+	rate *= asum
 	
 	return rate
 
-def BetaHist():  # Generate the beta histogram
-    hist = []    # Declare the content of the histogram
-    binWidth = (kemin-kemax)/numbins
-    for ki in range(kemin, kemax, binWidth):
-        leftBinEdge = beta(ki, Q, 0, 0)  # FIXME assuming Q is a variable and null scenario.
-        rightBinEdge = beta(ki+binWidth, Q, 0, 0)
-        binContent = binWidth*(leftBinEdge+rightBinEdge)/2
-        binContent *= integrationtime    # Unnecesarry if bin content is event rate.
-        hist.append(binContent);
-    return hist
+#def BetaHist():  # Generate the beta histogram
+#    hist = []    # Declare the content of the histogram
+#    binWidth = (kemin-kemax)/numbins
+#    for ki in range(kemin, kemax, binWidth):
+#        leftBinEdge = beta(ki, Q, 0, 0)  # FIXME assuming Q is a variable and null scenario.
+#        rightBinEdge = beta(ki+binWidth, Q, 0, 0)
+#        binContent = binWidth*(leftBinEdge+rightBinEdge)/2
+#        binContent *= integrationtime    # Unnecesarry if bin content is event rate.
+#        hist.append(binContent);
+#    return hist
           
 # -------------------------------
 # To create a TF1 object with a custom function, the function must take it's arguments via arrays
 # We could do away with this function by suitably defining beta - this is just a wrapper.
 def BetaSpectrum(variables,parameters):
 	Ke = variables[0]
-	thetae4 = parameters[0]
+	sin2thetae4 = parameters[0]
 	sterilemass = parameters[1]
-	return beta(Ke, thetae4, sterilemass)
+	return beta(Ke, sin2thetae4, sterilemass)
 # -------------------------------
 # A TF1 object based on the spectrum is needed to generate the expected counts for simulated data
 npars = 2						# Num parameters required for our custom function
@@ -163,9 +157,8 @@ betatf1 = TF1('betaspectrum', BetaSpectrum, kemin, kemax, npars) # this is the r
 # 2. Function for generating fake data spectrum for given mass and mixing angle
 # ===========================================================================================
 def DataSpectrum(mass,mixing):	# simulated count spectrum for a given mass and mixing angle
-	### FIXME it would be easier/nicer to step over Sin^2(theta_s) directly than theta_s
-	### so ensure DataSpectrum takes this as an argument
 
+	spectrum=[]
 #	# method 1: generate a suitable number of 'hits' point by point and bin into a histogram
 #	spectrumhist = TH1F('spectrum', 'Simulated Data', numkebins, kemin, kemax)
 #	betatf1.SetParameters(mass,mixing)
@@ -173,7 +166,6 @@ def DataSpectrum(mass,mixing):	# simulated count spectrum for a given mass and m
 #		KeOfThisHit = betatf1.GetRandom()
 #		spectrumhist.Fill(KeOfThisHit)
 #	spectrumbuffer = spectrumhist.GetArray()				# this returns a pointer to a ROOT buffer
-#	spectrum=[]
 #	for bini in range(0,numkebins):							# convert histogram to a normal list
 #		spectrum.append(spectrumbuffer[bini])
 	
@@ -190,9 +182,8 @@ def DataSpectrum(mass,mixing):	# simulated count spectrum for a given mass and m
 	kebinwidth = (kemax-kemin)/numkebins
 	for i in range(0,numkebins-1):							# spectrum runs from 0.1 to 18.574keV over 100 bins.
 		Ke = kemin + i*kebinwidth							# Ke of this bin centre in eV
-		parameters = [sterilemass,mixing]
-		expectedbincount = 
-			((BetaSpectrum(Ke-(kebinwidth/2),parameters)+BetaSpectrum(Ke+(kebinwidth/2),parameters))/2)*kebinwidth*integrationtime
+		parameters = [mixing,mass]
+		expectedbincount = BetaSpectrum([Ke],parameters)*kebinwidth*integrationtime
 		spectrum.append(expectedbincount)					# same as above just skip the Poisson step
 
 	return spectrum											# return simulated data
@@ -219,32 +210,51 @@ def Chi2FitToNull(nullSpectrum, modelSpectrum):	# Sum the elemental chi2 value.
 # ===========================================================================================
 # 4. Function for calculating the matrix of chi^2 over a range of masses and mixing angles
 # ===========================================================================================
-def CalculateChi2Matrix:
-	chi2array = []				# make 
+def CalculateChi2Matrix():
+	chi2array = []		# matrix of chi2. rows are masses, columns are mixing angles
 	mixinganglelist = []
-    nullSpectrum = DataSpectrum(-1, 0); # Generate a 3-mixing-only scenario.
+	masslist = []
+	nullSpectrum = DataSpectrum(-1, 0) # Generate a 3-mixing-only scenario
 # 4. Loop over a vector of prospective neutrino masses.
+	matplotlib.pyplot.figure()
 	for i in range(0,nummasses-1):
-		mass = massmin + (i/nummasses)*(massmax-massmin)
+		mass = massmin + ((1.*i)/nummasses)*(massmax-massmin)
 		chi2forthismass = []
 #    +  Loop over a vector of prospective mixing angles.
 		for j in range(0,nummixingangs-1):
-			power = mixingangmin + (j/nummixingangs)*(mixingangmax-mixingangmin)
-			sin2mixang = 10 ** power
+			power = mixingangmin + ((j*1.)/nummixingangs)*(mixingangmax-mixingangmin)
+			sin2mixang = 10 ** -power
+			print "mass = " + str(mass) + ", sin2mixang = " + str(sin2mixang)
+			if (j==0):
+				masslist.append(mass)
 			if (i==0):
 				mixinganglelist.append(sin2mixang)
 #       - Generate a set of datapoints representing a measured spectrum for that mass and mixing angle.
 			dataset = DataSpectrum(mass, sin2mixang)
+			
+#			# to take the difference we need to convert to np arrays
+#			dsa = np.array(nullSpectrum)
+#			na = np.array(dataset)
+#			diffarray = dsa-na
+#			diffplot = matplotlib.pyplot.plot(diffarray)
+#			title = "MC for sterile with mass " + str(mass) + " and sin2thetae4 " + str(sin2mixang)
+#			matplotlib.pyplot.title(title)
+			
 #       - Calculate the chi^2 of the null hypothesis fit to the data
 			chi2 = Chi2FitToNull(nullSpectrum, dataset)
 #       - Store the result in a vector for this mass.
 			chi2forthismass.append(chi2)
+#		matplotlib.pyplot.show() # will halt until closed
 		# plot the chi2 curve, for checking
-		thismassplot = matplotlib.pyplot.plot(chi2forthismass)
-		matplotlib.pyplot.show()
+		thismassplot = matplotlib.pyplot.plot(mixinganglelist,chi2forthismass)
+#		matplotlib.pyplot.title('Chi2 vs Mixing Angle for Mass ' + str(mass))
+#		matplotlib.pyplot.xlabel('Sin^2 Mixing angle')
+#		matplotlib.pyplot.ylabel('Chi2')
+#		matplotlib.pyplot.show()
 		# turns out to draw contours we can just use the curves directly, we don't need to find the values at 3 sigma
 		chi2array.append(chi2forthismass)
-	return chi2array
+	matplotlib.pyplot.show()
+	return chi2array, masslist, mixinganglelist
 # Obselete code, originally to fit a polynomial to the range of chi2's and find the mixing angles where chi2 corresponds to 3 sigma
 #		# TGraph takes array.array datatypes, so we need to convert from python lists
 #		mixinganglelistar = array('d',mixinganglelist)
@@ -282,12 +292,18 @@ def MakeContourPlots(masses, mixings, chi2vals):
 # 6. The Main Function
 # ===========================================================================================
 def main():
-	thechi2matrix = CalculateChi2Matrix()
-	MakeContourPlots()
-	## wait for input to keep the plot alive. 
+	print "doing main"
+#	nullSpectrum = DataSpectrum(-1, 0); # Generate a 3-mixing-only scenario.
+#	thismassplot = matplotlib.pyplot.plot(nullSpectrum) # visual check of spectrum
+#	matplotlib.pyplot.show()
+	chi2array, masslist, mixinganglelist = CalculateChi2Matrix()
+	MakeContourPlots(masslist, mixinganglelist, chi2array)
+	# wait for input to keep the plot alive. 
 	if __name__ == '__main__':
 		rep = ''
 		while not rep in [ 'q', 'Q' ]:
 			rep = raw_input( 'enter "q" to quit: ' )
 			if 1 < len(rep):
 				rep = rep[0]
+
+main()
